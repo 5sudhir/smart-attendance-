@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AttendIQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121a; --border: #1e1e2e;
+      --accent: #00e5ff; --text: #e2e8f0; --muted: #64748b;
+      --success: #00e5a0; --error: #ff4d6d;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px; position: relative; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none; z-index: 0;
+    }
+    .container { width: 100%; max-width: 480px; position: relative; z-index: 1; }
+    .header { text-align: center; margin-bottom: 32px; animation: fadeDown 0.6s ease both; }
+    .badge {
+      display: inline-block; font-family: 'Space Mono', monospace;
+      font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--accent); border: 1px solid rgba(0,229,255,0.3);
+      padding: 5px 14px; border-radius: 100px; margin-bottom: 12px;
+    }
+    h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    h1 span { color: var(--accent); }
+    .subtitle { margin-top: 6px; font-size: 13px; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px; animation: fadeUp 0.6s ease 0.1s both;
+    }
+    .tabs {
+      display: flex; gap: 6px; margin-bottom: 24px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
+    }
+    .tab {
+      flex: 1; padding: 9px 6px; border: none; background: transparent;
+      color: var(--muted); font-family: 'Syne', sans-serif;
+      font-size: 12px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    .tab.active { background: var(--accent); color: #000; }
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block; font-size: 10px; font-family: 'Space Mono', monospace;
+      letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px;
+    }
+    input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 13px 15px; color: var(--text);
+      font-family: 'Space Mono', monospace; font-size: 13px; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,255,0.1); }
+    .btn {
+      width: 100%; padding: 14px; background: var(--accent); color: #000;
+      border: none; border-radius: 10px; font-family: 'Syne', sans-serif;
+      font-size: 14px; font-weight: 800; cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s; margin-top: 6px;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,229,255,0.25); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn.secondary {
+      background: transparent; color: var(--accent);
+      border: 1px solid rgba(0,229,255,0.3); margin-top: 10px;
+    }
+    .btn.purple { background: #7c3aed; color: #fff; }
+    .btn.red { background: var(--error); color: #fff; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 20px; font-family: 'Space Mono', monospace; font-size: 12px;
+      color: var(--text); z-index: 999; transition: transform 0.3s ease; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: var(--success); color: var(--success); }
+    .toast.error { border-color: var(--error); color: var(--error); }
+
+    /* QR */
+    .qr-result { display: none; animation: fadeUp 0.4s ease both; }
+    .qr-result.show { display: block; }
+    .qr-box {
+      background: #fff; display: inline-block; padding: 14px;
+      border-radius: 14px; margin: 18px 0;
+      box-shadow: 0 0 40px rgba(0,229,255,0.2);
+    }
+    .student-info {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px; margin-bottom: 18px; text-align: left;
+    }
+    .info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 10px; }
+    .info-value { font-weight: 600; color: var(--accent); font-family: 'Space Mono', monospace; }
+    .success-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3);
+      color: var(--success); border-radius: 100px; padding: 5px 14px;
+      font-size: 11px; font-family: 'Space Mono', monospace; margin-bottom: 14px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 1.5s infinite; }
+
+    /* Scanner */
+    #video-container {
+      position: relative; width: 100%; aspect-ratio: 1;
+      border-radius: 16px; overflow: hidden; background: #000;
+      border: 2px solid var(--border); margin-bottom: 16px;
+    }
+    #scanner-video { width: 100%; height: 100%; object-fit: cover; }
+    .scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .scan-frame { width: 180px; height: 180px; position: relative; }
+    .scan-frame::before, .scan-frame::after, .scan-frame span::before, .scan-frame span::after {
+      content: ''; position: absolute; width: 28px; height: 28px; border-color: var(--accent); border-style: solid;
+    }
+    .scan-frame::before { top: 0; left: 0; border-width: 3px 0 0 3px; }
+    .scan-frame::after { top: 0; right: 0; border-width: 3px 3px 0 0; }
+    .scan-frame span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; }
+    .scan-frame span::after { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+    .scan-line {
+      position: absolute; width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scanMove 2s ease-in-out infinite; top: 0;
+    }
+    .scan-status { text-align: center; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+
+    /* Log */
+    .log-box {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px; margin-top: 16px;
+    }
+    .log-title { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+    .log-scroll { max-height: 200px; overflow-y: auto; }
+    .log-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 11px; font-family: 'Space Mono', monospace;
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-name { color: var(--text); font-weight: 600; }
+    .log-roll { color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .log-time-in { color: var(--success); }
+    .log-time-out { color: #f59e0b; }
+    .empty-log { text-align: center; color: var(--muted); font-size: 11px; font-family: 'Space Mono', monospace; padding: 20px 0; }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.3); border-top-color: #000;
+      border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px;
+    }
+
+    /* Pages */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .footer {
+      text-align: center; margin-top: 20px;
+      font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted);
+      animation: fadeUp 0.6s ease 0.3s both;
+    }
+
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes scanMove { 0% { top: 0; } 50% { top: calc(100% - 2px); } 100% { top: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="badge">● Smart Attendance</div>
+    <h1>Attend<span>IQ</span></h1>
+    <p class="subtitle">Firebase-powered attendance tracker</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('register')">Get QR</button>
+      <button class="tab" onclick="switchTab('scanner')">Scan</button>
+      <button class="tab" onclick="switchTab('records')">Records</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="page active" id="page-register">
+      <div id="register-form">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="student-name" placeholder="Rahul Sharma"/>
+        </div>
+        <div class="form-group">
+          <label>Roll Number</label>
+          <input type="text" id="roll-no" placeholder="CS2024001"/>
+        </div>
+        <div class="form-group">
+          <label>Class / Course</label>
+          <input type="text" id="course" placeholder="BCA 2nd Year"/>
+        </div>
+        <button class="btn" id="gen-btn" onclick="generateQR()">Generate QR Code →</button>
+      </div>
+
+      <div class="qr-result" id="qr-result">
+        <div style="text-align:center;">
+          <div class="success-badge"><div class="dot"></div>QR Ready</div>
+          <div class="student-info" id="student-info-display"></div>
+          <div class="qr-box"><div id="qrcode"></div></div>
+          <p style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:14px;">Screenshot this — show at entry & exit</p>
+          <button class="btn" onclick="downloadQR()">Download QR</button>
+          <button class="btn secondary" onclick="resetForm()">← New Student</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCANNER -->
+    <div class="page" id="page-scanner">
+
+      <!-- Password Gate -->
+      <div id="scanner-gate">
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+          <div style="font-weight:700; font-size:16px; margin-bottom:6px;">Teacher Access Only</div>
+          <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace;">Enter password to unlock scanner</div>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="scanner-password" placeholder="Enter teacher password" onkeydown="if(event.key==='Enter') unlockScanner()"/>
+        </div>
+        <button class="btn" onclick="unlockScanner()">Unlock Scanner →</button>
+        <div id="pass-error" style="display:none; color:var(--error); font-size:11px; font-family:'Space Mono',monospace; text-align:center; margin-top:10px;">Wrong password. Try again.</div>
+      </div>
+
+      <!-- Actual Scanner -->
+      <div id="scanner-content" style="display:none;">
+      <div id="video-container">
+        <video id="scanner-video" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame"><span></span><div class="scan-line"></div></div>
+        </div>
+      </div>
+      <div class="scan-status" id="scan-status">Camera off — press Start</div>
+
+      <div id="scan-feedback" style="display:none; background:rgba(0,229,160,0.1); border:1px solid rgba(0,229,160,0.3); border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div style="color:var(--success); font-weight:700; font-size:13px; margin-bottom:6px;">✓ Marked!</div>
+        <div id="scan-details" style="font-family:'Space Mono',monospace; font-size:11px; color:var(--text);"></div>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="start-btn" onclick="startScanner()" style="flex:1;">Start Camera</button>
+        <button class="btn red" onclick="stopScanner()" style="flex:1;">Stop</button>
+      </div>
+
+      <div class="log-box">
+        <div class="log-title">Today's Log</div>
+        <div class="log-scroll" id="scanner-log"><div class="empty-log">No scans yet</div></div>
+      </div>
+      </div> <!-- end scanner-content -->
+    </div>
+
+    <!-- RECORDS -->
+    <div class="page" id="page-records">
+      <div class="form-group">
+        <label>Filter by Date</label>
+        <input type="date" id="filter-date"/>
+      </div>
+      <button class="btn" onclick="loadRecords()">Load Records</button>
+      <button class="btn purple" onclick="exportCSV()" style="margin-top:10px;">Export to Excel (CSV)</button>
+
+      <div class="log-box" style="margin-top:16px;">
+        <div class="log-title" id="records-title">All Records</div>
+        <div class="log-scroll" id="records-list"><div class="empty-log">Press "Load Records"</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Powered by Firebase • AttendIQ</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs,
+    query, where, orderBy, updateDoc, doc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCr86wv20ThSpsNEwtPW3iQIKE8ysYrsf8",
+    authDomain: "attendance-sheet-76b17.firebaseapp.com",
+    projectId: "attendance-sheet-76b17",
+    storageBucket: "attendance-sheet-76b17.firebasestorage.app",
+    messagingSenderId: "903219402001",
+    appId: "1:903219402001:web:3b8a386c32ce95a82c68b0"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ---- Helpers ----
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = 'toast show ' + type;
+    setTimeout(() => t.className = 'toast', 3000);
+  }
+
+  function getTodayStr() {
+    return new Date().toLocaleDateString('en-IN');
+  }
+
+  function getTimeStr() {
+    return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ---- Tab switching ----
+  window.switchTab = function(tab) {
+    ['register','scanner','records'].forEach((t, i) => {
+      document.getElementById('page-' + t).classList.toggle('active', t === tab);
+      document.querySelectorAll('.tab')[i].classList.toggle('active', t === tab);
+    });
+    if (tab !== 'scanner') stopScanner();
+    if (tab === 'records') loadRecords();
+    // Reset scanner gate on tab switch
+    if (tab === 'scanner') {
+      document.getElementById('scanner-gate').style.display = 'block';
+      document.getElementById('scanner-content').style.display = 'none';
+      document.getElementById('scanner-password').value = '';
+      document.getElementById('pass-error').style.display = 'none';
+    }
+  };
+
+  // Password for scanner — change this to your own password
+  const TEACHER_PASSWORD = 'teacher123';
+
+  window.unlockScanner = function() {
+    const entered = document.getElementById('scanner-password').value;
+    if (entered === TEACHER_PASSWORD) {
+      document.getElementById('scanner-gate').style.display = 'none';
+      document.getElementById('scanner-content').style.display = 'block';
+      document.getElementById('pass-error').style.display = 'none';
+    } else {
+      document.getElementById('pass-error').style.display = 'block';
+      document.getElementById('scanner-password').value = '';
+    }
+  };
+
+  // ---- REGISTER + QR ----
+  let currentStudent = null;
+
+  window.generateQR = async function() {
+    const name = document.getElementById('student-name').value.trim();
+    const roll = document.getElementById('roll-no').value.trim();
+    const course = document.getElementById('course').value.trim();
+    if (!name || !roll || !course) { showToast('Fill all fields', 'error'); return; }
+
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Saving...';
+
+    try {
+      // Save student to Firestore
+      await addDoc(collection(db, 'students'), { name, roll, course, createdAt: serverTimestamp() });
+
+      currentStudent = { name, roll, course };
+
+      document.getElementById('student-info-display').innerHTML = `
+        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${name}</span></div>
+        <div class="info-row"><span class="info-label">Roll</span><span class="info-value">${roll}</span></div>
+        <div class="info-row"><span class="info-label">Course</span><span class="info-value">${course}</span></div>
+      `;
+
+      document.getElementById('qrcode').innerHTML = '';
+      new QRCode(document.getElementById('qrcode'), {
+        text: JSON.stringify({ name, roll, course }),
+        width: 200, height: 200,
+        colorDark: '#000', colorLight: '#fff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      document.getElementById('register-form').style.display = 'none';
+      document.getElementById('qr-result').classList.add('show');
+      showToast('Student saved!', 'success');
+    } catch (e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Generate QR Code →';
+  };
+
+  window.resetForm = function() {
+    document.getElementById('register-form').style.display = 'block';
+    document.getElementById('qr-result').classList.remove('show');
+    ['student-name','roll-no','course'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('qrcode').innerHTML = '';
+  };
+
+  window.downloadQR = function() {
+    const canvas = document.querySelector('#qrcode canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `QR_${currentStudent.roll}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+  };
+
+  // ---- SCANNER ----
+  let stream = null;
+  let scanInterval = null;
+  let lastScanned = '';
+  let lastScanTime = 0;
+  let isProcessing = false;
+
+  window.startScanner = async function() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      document.getElementById('scanner-video').srcObject = stream;
+      document.getElementById('scan-status').textContent = 'Scanning... show QR code';
+      document.getElementById('start-btn').disabled = true;
+      startDecoding();
+      loadTodayLog();
+    } catch(e) {
+      showToast('Camera denied — allow permission', 'error');
+    }
+  };
+
+  window.stopScanner = function() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    document.getElementById('scan-status').textContent = 'Camera off — press Start';
+    document.getElementById('start-btn').disabled = false;
+  };
+
+  function startDecoding() {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    scanInterval = setInterval(() => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && 'BarcodeDetector' in window) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        detector.detect(canvas).then(codes => {
+          if (codes.length > 0) handleScan(codes[0].rawValue);
+        });
+      }
+    }, 600);
+  }
+
+  async function handleScan(raw) {
+    const now = Date.now();
+    if (isProcessing) return;
+    if (raw === lastScanned && now - lastScanTime < 10000) return;
+
+    try {
+      isProcessing = true;
+      const student = JSON.parse(raw);
+      const today = getTodayStr();
+      const time = getTimeStr();
+
+      // Check if entry already exists today (no exit yet)
+      const q = query(
+        collection(db, 'attendance'),
+        where('roll', '==', student.roll),
+        where('date', '==', today)
+      );
+      const snap = await getDocs(q);
+
+      let action, docRef;
+
+      if (!snap.empty) {
+        const existing = snap.docs[0];
+        if (!existing.data().exitTime) {
+          await updateDoc(doc(db, 'attendance', existing.id), { exitTime: time });
+          action = 'Exit';
+        } else {
+          showToast('Already fully logged today', '');
+          return;
+        }
+      } else {
+        docRef = await addDoc(collection(db, 'attendance'), {
+          name: student.name, roll: student.roll, course: student.course,
+          date: today, entryTime: time, exitTime: '', createdAt: serverTimestamp()
+        });
+        action = 'Entry';
+      }
+
+      lastScanned = raw;
+      lastScanTime = now;
+
+      const fb = document.getElementById('scan-feedback');
+      document.getElementById('scan-details').innerHTML = `
+        <div>Name: ${student.name}</div>
+        <div>Roll: ${student.roll}</div>
+        <div>Action: <span style="color:var(--accent)">${action}</span> at ${time}</div>
+      `;
+      fb.style.display = 'block';
+      setTimeout(() => fb.style.display = 'none', 4000);
+      showToast(`${action} marked — ${student.name}`, 'success');
+      loadTodayLog();
+    } catch(e) {
+      // Not a valid QR
+    } finally {
+      isProcessing = false;
+    }
+  }
+
+  async function loadTodayLog() {
+    const today = getTodayStr();
+    const q = query(collection(db, 'attendance'), where('date', '==', today));
+    const snap = await getDocs(q);
+    const logDiv = document.getElementById('scanner-log');
+
+    if (snap.empty) { logDiv.innerHTML = '<div class="empty-log">No scans yet</div>'; return; }
+
+    logDiv.innerHTML = snap.docs.map(d => {
+      const e = d.data();
+      return `<div class="log-item">
+        <div><div class="log-name">${e.name}</div><div class="log-roll">${e.roll}</div></div>
+        <div style="text-align:right;">
+          <div class="log-time-in">In: ${e.entryTime}</div>
+          <div class="log-time-out">Out: ${e.exitTime || '—'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ---- RECORDS ----
+  let allRecords = [];
+
+  window.loadRecords = async function() {
+    const dateVal = document.getElementById('filter-date').value;
+    const listDiv = document.getElementById('records-list');
+    const titleDiv = document.getElementById('records-title');
+    listDiv.innerHTML = '<div class="empty-log">Loading...</div>';
+
+    try {
+      let q;
+      if (dateVal) {
+        const formatted = new Date(dateVal).toLocaleDateString('en-IN');
+        q = query(collection(db, 'attendance'), where('date', '==', formatted));
+        titleDiv.textContent = 'Records: ' + formatted;
+      } else {
+        q = query(collection(db, 'attendance'), orderBy('createdAt', 'desc'));
+        titleDiv.textContent = 'All Records';
+      }
+
+      const snap = await getDocs(q);
+      allRecords = snap.docs.map(d => d.data());
+
+      if (allRecords.length === 0) {
+        listDiv.innerHTML = '<div class="empty-log">No records found</div>';
+        return;
+      }
+
+      listDiv.innerHTML = allRecords.map(e => `
+        <div class="log-item">
+          <div><div class="log-name">${e.name}</div><div class="log-roll">${e.roll} • ${e.course}</div></div>
+          <div style="text-align:right; font-size:10px;">
+            <div style="color:var(--muted);">${e.date}</div>
+            <div class="log-time-in">In: ${e.entryTime}</div>
+            <div class="log-time-out">Out: ${e.exitTime || '—'}</div>
+          </div>
+        </div>
+      `).join('');
+    } catch(e) {
+      listDiv.innerHTML = '<div class="empty-log">Error loading. Check Firestore rules.</div>';
+    }
+  };
+
+  window.exportCSV = function() {
+    if (allRecords.length === 0) { showToast('Load records first', 'error'); return; }
+    const headers = ['Name','Roll No','Course','Date','Entry Time','Exit Time'];
+    const rows = allRecords.map(e => [e.name, e.roll, e.course, e.date, e.entryTime, e.exitTime || 'N/A']);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Attendance_${new Date().toLocaleDateString('en-IN').replace(/\//g,'-')}.csv`;
+    link.click();
+    showToast('Exported!', 'success');
+  };
+
+  // Set today's date as default
+  document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
